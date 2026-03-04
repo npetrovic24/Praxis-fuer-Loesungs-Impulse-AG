@@ -12,7 +12,7 @@ const allNavItems = [
   { href: "/admin/reflexionen", label: "Reflexionen", icon: MessageCircle, adminOnly: false },
   { href: "/admin/members", label: "Benutzer", icon: Users, adminOnly: false },
   { href: "/admin/courses", label: "Lehrgänge", icon: BookOpen, adminOnly: true },
-  { href: "/chat", label: "Chat", icon: MessageSquare, adminOnly: false },
+  { href: "/admin/chat", label: "Chat", icon: MessageSquare, adminOnly: false },
 ];
 
 interface AdminSidebarMobileProps {
