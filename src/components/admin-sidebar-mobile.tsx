@@ -77,7 +77,7 @@ export function AdminSidebarMobile({ role, userName }: AdminSidebarMobileProps) 
           </div>
         )}
         <Link
-          href="/settings"
+          href="/admin/settings"
           className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
         >
           <Settings className="h-4 w-4" />

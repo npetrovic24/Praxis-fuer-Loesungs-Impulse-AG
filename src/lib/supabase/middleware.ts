@@ -94,15 +94,22 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Admin/Dozent on member chat → redirect to admin chat
-  if ((profile?.role === "admin" || profile?.role === "dozent") && pathname.startsWith("/chat")) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/admin/chat";
-    return NextResponse.redirect(url);
+  // Admin/Dozent on member routes → redirect to admin equivalents
+  if (profile?.role === "admin" || profile?.role === "dozent") {
+    if (pathname.startsWith("/chat")) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/admin/chat";
+      return NextResponse.redirect(url);
+    }
+    if (pathname === "/settings") {
+      const url = request.nextUrl.clone();
+      url.pathname = "/admin/settings";
+      return NextResponse.redirect(url);
+    }
   }
 
-  // Dozent should never be in member/participant area (except /settings) - redirect to admin
-  if (profile?.role === "dozent" && !pathname.startsWith("/admin") && pathname !== "/settings") {
+  // Dozent should never be in member/participant area - redirect to admin
+  if (profile?.role === "dozent" && !pathname.startsWith("/admin")) {
     const url = request.nextUrl.clone();
     url.pathname = "/admin/members";
     return NextResponse.redirect(url);
@@ -113,8 +120,8 @@ export async function updateSession(request: NextRequest) {
     if (profile?.role === "admin") {
       // Admin can access everything
     } else if (profile?.role === "dozent") {
-      // Dozent can access /admin/members, /admin/reflexionen and /admin/chat
-      if (!pathname.startsWith("/admin/members") && !pathname.startsWith("/admin/reflexionen") && !pathname.startsWith("/admin/chat")) {
+      // Dozent can access /admin/members, /admin/reflexionen, /admin/chat and /admin/settings
+      if (!pathname.startsWith("/admin/members") && !pathname.startsWith("/admin/reflexionen") && !pathname.startsWith("/admin/chat") && !pathname.startsWith("/admin/settings")) {
         const url = request.nextUrl.clone();
         url.pathname = "/admin/members";
         return NextResponse.redirect(url);

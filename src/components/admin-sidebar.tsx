@@ -80,10 +80,10 @@ export function AdminSidebar({ role, userName }: AdminSidebarProps) {
             </div>
           )}
           <Link
-            href="/settings"
+            href="/admin/settings"
             className={cn(
               "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-              pathname === "/settings"
+              pathname === "/admin/settings"
                 ? "bg-accent text-accent-foreground"
                 : "text-muted-foreground hover:bg-secondary hover:text-foreground"
             )}
