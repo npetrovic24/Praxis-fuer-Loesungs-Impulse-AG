@@ -2,7 +2,6 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { revalidatePath } from "next/cache";
 
 export async function getChatMessages(courseId: string, limit = 50) {
   const supabase = await createClient();
@@ -25,7 +24,6 @@ export async function getChatMessages(courseId: string, limit = 50) {
     .limit(limit);
 
   if (error) throw new Error(error.message);
-  // Normalize user from array to single object
   return (data || []).map((msg: any) => ({
     ...msg,
     user: Array.isArray(msg.user) ? msg.user[0] || null : msg.user,
@@ -41,7 +39,27 @@ export async function sendChatMessage(courseId: string, content: string) {
   if (!trimmed) return { error: "Nachricht darf nicht leer sein." };
   if (trimmed.length > 2000) return { error: "Nachricht zu lang (max. 2000 Zeichen)." };
 
+  // Verify user has access to this course
   const admin = createAdminClient();
+  const { data: profile } = await admin
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+
+  if (profile?.role !== "admin" && profile?.role !== "dozent") {
+    const { data: grant } = await admin
+      .from("access_grants")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("course_id", courseId)
+      .eq("is_granted", true)
+      .limit(1)
+      .single();
+
+    if (!grant) return { error: "Kein Zugriff auf diesen Kurs." };
+  }
+
   const { error } = await admin
     .from("chat_messages")
     .insert({ course_id: courseId, user_id: user.id, content: trimmed });
@@ -56,8 +74,6 @@ export async function getUserCourses() {
   if (!user) throw new Error("Not authenticated");
 
   const admin = createAdminClient();
-
-  // Check role
   const { data: profile } = await admin
     .from("profiles")
     .select("role")
@@ -65,7 +81,6 @@ export async function getUserCourses() {
     .single();
 
   if (profile?.role === "admin" || profile?.role === "dozent") {
-    // Admins and dozents see all courses
     const { data } = await admin
       .from("courses")
       .select("id, name")
@@ -74,7 +89,6 @@ export async function getUserCourses() {
     return data || [];
   }
 
-  // Participants see only their granted courses
   const { data } = await admin
     .from("access_grants")
     .select("course:courses(id, name)")
