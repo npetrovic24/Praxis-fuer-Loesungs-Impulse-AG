@@ -143,7 +143,7 @@ async function notifyTeamAboutNewReflexion(userId: string, assignmentId: string,
   const courseName = (assignment as any)?.unit?.course?.name || "Unbekannter Kurs";
   const assignmentTitle = assignment?.title || "Reflexion";
 
-  // Get admins (always notified) + assigned dozent(s) for this participant
+  // Get admins (always notified) + assigned dozent or all dozents if unassigned
   const { data: admins } = await admin
     .from("profiles")
     .select("email")
@@ -155,8 +155,21 @@ async function notifyTeamAboutNewReflexion(userId: string, assignmentId: string,
     .select("dozent_id, dozent:profiles!dozent_assignments_dozent_id_fkey(email)")
     .eq("participant_id", userId);
 
+  let dozentEmails: string[];
+  if (assignments && assignments.length > 0) {
+    // Has assigned dozent → only notify them
+    dozentEmails = assignments.map((a: any) => a.dozent?.email).filter(Boolean);
+  } else {
+    // Unassigned → notify ALL active dozents
+    const { data: allDozents } = await admin
+      .from("profiles")
+      .select("email")
+      .eq("role", "dozent")
+      .eq("is_active", true);
+    dozentEmails = (allDozents || []).map(d => d.email);
+  }
+
   const adminEmails = (admins || []).map(a => a.email);
-  const dozentEmails = (assignments || []).map((a: any) => a.dozent?.email).filter(Boolean);
   const emails = [...new Set([...adminEmails, ...dozentEmails])];
 
   if (emails.length === 0) {
@@ -255,11 +268,20 @@ export async function getAllSubmissions(statusFilter?: SubmissionStatus) {
   const { data, error } = await query;
   if (error) throw new Error(error.message);
   
-  // Dozent: filter to only assigned participants
+  // Dozent: filter to assigned + unassigned participants
   if (role === "dozent") {
     const { getMyAssignedParticipantIds } = await import("./members");
     const assignedIds = await getMyAssignedParticipantIds(user.id);
-    return (data || []).filter((s: any) => assignedIds.includes(s.user_id));
+    
+    // Get all assigned participant IDs (across all dozents)
+    const { data: allAssignments } = await admin
+      .from("dozent_assignments")
+      .select("participant_id");
+    const allAssignedIds = new Set((allAssignments || []).map((a: any) => a.participant_id));
+    
+    return (data || []).filter((s: any) => 
+      assignedIds.includes(s.user_id) || !allAssignedIds.has(s.user_id)
+    );
   }
   
   return data || [];

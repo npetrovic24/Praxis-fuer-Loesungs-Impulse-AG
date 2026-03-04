@@ -323,18 +323,28 @@ export async function getParticipants() {
   const { user, role } = await requireAdminOrDozent();
   const admin = createAdminClient();
   
-  // Dozent: only show assigned participants
+  // Dozent: show assigned participants + unassigned participants
   if (role === "dozent") {
-    const assignedIds = await getMyAssignedParticipantIds(user.id);
-    if (assignedIds.length === 0) return [];
-    const { data, error } = await admin
+    const myAssignedIds = await getMyAssignedParticipantIds(user.id);
+    
+    // Get ALL assigned participant IDs (across all dozents)
+    const { data: allAssignments } = await admin
+      .from("dozent_assignments")
+      .select("participant_id");
+    const allAssignedIds = new Set((allAssignments || []).map(a => a.participant_id));
+    
+    // Get all participants
+    const { data: allParticipants, error } = await admin
       .from("profiles")
       .select("*")
       .eq("role", "participant")
-      .in("id", assignedIds)
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
-    return data;
+    
+    // Filter: my assigned + unassigned
+    return (allParticipants || []).filter(p => 
+      myAssignedIds.includes(p.id) || !allAssignedIds.has(p.id)
+    );
   }
   
   // Admin: show all
