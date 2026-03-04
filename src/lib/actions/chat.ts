@@ -100,3 +100,57 @@ export async function getUserCourses() {
     .map((ag: any) => ag.course)
     .filter(Boolean);
 }
+
+// ─── Chat Read Status ───
+
+export async function markChatAsRead(courseId: string) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+  const admin = createAdminClient();
+  
+  await admin.from("chat_read_status").upsert({
+    user_id: user.id,
+    course_id: courseId,
+    last_read_at: new Date().toISOString(),
+  }, { onConflict: "user_id,course_id" });
+}
+
+export async function getUnreadChatCounts(): Promise<Record<string, number>> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return {};
+  const admin = createAdminClient();
+
+  // Get all read statuses for this user
+  const { data: readStatuses } = await admin
+    .from("chat_read_status")
+    .select("course_id, last_read_at")
+    .eq("user_id", user.id);
+
+  const readMap: Record<string, string> = {};
+  for (const rs of readStatuses || []) {
+    readMap[rs.course_id] = rs.last_read_at;
+  }
+
+  // Get message counts per course, excluding own messages
+  const { data: messages } = await admin
+    .from("chat_messages")
+    .select("course_id, created_at")
+    .neq("user_id", user.id);
+
+  const counts: Record<string, number> = {};
+  for (const msg of messages || []) {
+    const lastRead = readMap[msg.course_id];
+    if (!lastRead || new Date(msg.created_at) > new Date(lastRead)) {
+      counts[msg.course_id] = (counts[msg.course_id] || 0) + 1;
+    }
+  }
+
+  return counts;
+}
+
+export async function getTotalUnreadCount(): Promise<number> {
+  const counts = await getUnreadChatCounts();
+  return Object.values(counts).reduce((a, b) => a + b, 0);
+}

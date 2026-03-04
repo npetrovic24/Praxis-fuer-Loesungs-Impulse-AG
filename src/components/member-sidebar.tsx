@@ -1,10 +1,12 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { BookOpen, PenLine, Settings, LogOut, MessageCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
+import { getTotalUnreadCount } from "@/lib/actions/chat";
 
 const navItems = [
   { href: "/dashboard", label: "Meine Lehrgänge", icon: BookOpen },
@@ -18,6 +20,22 @@ interface MemberSidebarProps {
 
 export function MemberSidebar({ userName }: MemberSidebarProps) {
   const pathname = usePathname();
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    getTotalUnreadCount().then(setUnreadCount).catch(() => {});
+  }, [pathname]);
+
+  useEffect(() => {
+    const supabase = createClient();
+    const channel = supabase
+      .channel("chat-badge-member")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "chat_messages" }, () => {
+        getTotalUnreadCount().then(setUnreadCount).catch(() => {});
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, []);
 
   const handleLogout = async () => {
     const supabase = createClient();
@@ -54,7 +72,12 @@ export function MemberSidebar({ userName }: MemberSidebarProps) {
               )}
             >
               <item.icon className="h-4 w-4" />
-              {item.label}
+              <span className="flex-1">{item.label}</span>
+              {item.href === "/chat" && unreadCount > 0 && (
+                <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[#0099A8] px-1.5 text-[11px] font-semibold text-white">
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </span>
+              )}
             </Link>
           ))}
         </nav>

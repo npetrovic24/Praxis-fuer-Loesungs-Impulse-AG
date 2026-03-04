@@ -1,10 +1,12 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LayoutDashboard, Users, UserCog, BookOpen, MessageCircle, MessageSquare, Settings, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
+import { getTotalUnreadCount } from "@/lib/actions/chat";
 import type { UserRole } from "@/lib/types";
 
 const allNavItems = [
@@ -23,9 +25,27 @@ interface AdminSidebarProps {
 
 export function AdminSidebar({ role, userName }: AdminSidebarProps) {
   const pathname = usePathname();
+  const [unreadCount, setUnreadCount] = useState(0);
   const navItems = role === "dozent"
     ? allNavItems.filter((item) => !item.adminOnly)
     : allNavItems;
+
+  // Fetch unread count on mount and when path changes
+  useEffect(() => {
+    getTotalUnreadCount().then(setUnreadCount).catch(() => {});
+  }, [pathname]);
+
+  // Realtime: listen for new chat messages
+  useEffect(() => {
+    const supabase = createClient();
+    const channel = supabase
+      .channel("chat-badge")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "chat_messages" }, () => {
+        getTotalUnreadCount().then(setUnreadCount).catch(() => {});
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, []);
 
   const homeHref = role === "dozent" ? "/admin/members" : "/admin";
   const title = role === "dozent" ? "Verwaltung" : "Admin";
@@ -64,7 +84,12 @@ export function AdminSidebar({ role, userName }: AdminSidebarProps) {
                 )}
               >
                 <item.icon className="h-4 w-4" />
-                {item.label}
+                <span className="flex-1">{item.label}</span>
+                {item.href === "/admin/chat" && unreadCount > 0 && (
+                  <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[#0099A8] px-1.5 text-[11px] font-semibold text-white">
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </span>
+                )}
               </Link>
             );
           })}

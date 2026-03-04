@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useTransition } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { getChatMessages, sendChatMessage } from "@/lib/actions/chat";
+import { getChatMessages, sendChatMessage, markChatAsRead } from "@/lib/actions/chat";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -46,6 +46,7 @@ export function ChatClient({ courses, currentUserId, currentUserName, currentUse
     getChatMessages(activeCourseId).then((data) => {
       setMessages(data);
       setIsLoading(false);
+      markChatAsRead(activeCourseId);
     });
   }, [activeCourseId]);
 
@@ -68,6 +69,7 @@ export function ChatClient({ courses, currentUserId, currentUserName, currentUse
           // Fetch the full message with user profile
           const msgs = await getChatMessages(activeCourseId);
           setMessages(msgs);
+          markChatAsRead(activeCourseId);
         }
       )
       .subscribe();
