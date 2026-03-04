@@ -17,7 +17,7 @@ export async function getChatMessages(courseId: string, limit = 50) {
       user_id,
       content,
       created_at,
-      user:profiles!chat_messages_user_id_fkey(id, full_name, role)
+      user:profiles!chat_messages_user_id_profiles_fkey(id, full_name, role)
     `)
     .eq("course_id", courseId)
     .order("created_at", { ascending: true })
