@@ -97,18 +97,34 @@ export async function createSubmission(params: {
   }).select("id").single();
   if (error) return { error: error.message };
 
-  // Send notification to admins + dozents (fire & forget)
-  notifyTeamAboutNewReflexion(user.id, params.assignmentId, submission.id).catch((err) => {
+  // Send notification to admins + dozents (awaited to prevent duplicate from retry)
+  try {
+    await notifyTeamAboutNewReflexion(user.id, params.assignmentId, submission.id);
+  } catch (err) {
     console.error("Failed to send reflexion notifications:", err);
-  });
+  }
 
   revalidatePath("/reflexionen");
   return { success: true };
 }
 
+// Simple dedup: track recently notified submission IDs (in-memory, per serverless instance)
+const recentlyNotified = new Set<string>();
+
 async function notifyTeamAboutNewReflexion(userId: string, assignmentId: string, submissionId: string) {
+  // Prevent duplicate notifications for same submission
+  if (recentlyNotified.has(submissionId)) {
+    console.log(`⚠️ Skipping duplicate notification for submission ${submissionId}`);
+    return;
+  }
+  recentlyNotified.add(submissionId);
+  // Clean up after 60s to prevent memory leak
+  setTimeout(() => recentlyNotified.delete(submissionId), 60_000);
+
   const { sendNewReflexionNotification } = await import("@/lib/email");
   const admin = createAdminClient();
+
+  console.log(`📧 Sending reflexion notifications for submission ${submissionId}...`);
 
   // Get student name
   const { data: student } = await admin
@@ -134,8 +150,12 @@ async function notifyTeamAboutNewReflexion(userId: string, assignmentId: string,
     .in("role", ["admin", "dozent"])
     .eq("is_active", true);
 
-  if (!team || team.length === 0) return;
+  if (!team || team.length === 0) {
+    console.log("⚠️ No active team members found for notification");
+    return;
+  }
 
+  console.log(`📧 Notifying ${team.length} team members: ${team.map(m => m.email).join(", ")}`);
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://portal.loesungs-impulse.ch";
 
   // Send to all team members in parallel
