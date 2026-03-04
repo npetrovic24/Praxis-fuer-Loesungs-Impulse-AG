@@ -154,7 +154,7 @@ export async function createMember(formData: {
       type: "recovery",
       email: formData.email,
       options: {
-        redirectTo: `https://pli-portal.vercel.app/set-password`,
+        redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || "https://portal.loesungs-impulse.ch"}/set-password`,
       },
     });
 

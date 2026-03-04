@@ -35,7 +35,7 @@ export interface AccessExpiredEmailData {
  */
 export async function sendWelcomeEmail(data: WelcomeEmailData): Promise<void> {
   try {
-    const loginUrl = data.loginUrl || "https://pli-portal.vercel.app/login";
+    const loginUrl = data.loginUrl || "https://portal.loesungs-impulse.ch/login";
 
     const roleGreeting = data.role === "admin"
       ? "Ihr Admin-Zugang zum PLI Lernportal wurde erfolgreich eingerichtet."
@@ -102,7 +102,7 @@ export async function sendWelcomeEmail(data: WelcomeEmailData): Promise<void> {
  */
 export async function sendPasswordResetEmail(data: PasswordResetEmailData): Promise<void> {
   try {
-    const loginUrl = data.loginUrl || "https://pli-portal.vercel.app/login";
+    const loginUrl = data.loginUrl || "https://portal.loesungs-impulse.ch/login";
     
     await resend.emails.send({
       from: FROM_EMAIL,
