@@ -2,18 +2,35 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import {
   Clock,
   CheckCircle2,
   MessageCircle,
-  PenLine,
   ChevronRight,
   FileText,
   Sparkles,
+  Pencil,
+  Trash2,
+  X,
+  Save,
 } from "lucide-react";
+import { updateSubmission, deleteSubmission } from "@/lib/actions/submissions";
 
 type Tab = "offen" | "feedback";
 
@@ -45,8 +62,14 @@ interface ReflexionenClientProps {
   submissions: Submission[];
 }
 
-export function ReflexionenClient({ submissions }: ReflexionenClientProps) {
+export function ReflexionenClient({ submissions: initialSubmissions }: ReflexionenClientProps) {
+  const [submissions, setSubmissions] = useState(initialSubmissions);
   const [tab, setTab] = useState<Tab>("offen");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editContent, setEditContent] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const router = useRouter();
 
   const openSubmissions = submissions.filter(
     (s) => s.status === "pending" || s.status === "in_review"
@@ -56,6 +79,51 @@ export function ReflexionenClient({ submissions }: ReflexionenClientProps) {
   );
 
   const current = tab === "offen" ? openSubmissions : feedbackSubmissions;
+
+  function startEdit(e: React.MouseEvent, s: Submission) {
+    e.preventDefault();
+    e.stopPropagation();
+    setEditingId(s.id);
+    setEditContent(s.content);
+  }
+
+  async function handleSaveEdit(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!editingId || !editContent.trim()) return;
+    setSaving(true);
+    const result = await updateSubmission(editingId, editContent.trim());
+    if (result.success) {
+      setSubmissions((prev) =>
+        prev.map((s) => s.id === editingId ? { ...s, content: editContent.trim() } : s)
+      );
+      setEditingId(null);
+    } else {
+      alert(result.error || "Fehler beim Speichern");
+    }
+    setSaving(false);
+  }
+
+  function cancelEdit(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setEditingId(null);
+  }
+
+  async function handleDelete(submissionId: string) {
+    setDeleting(submissionId);
+    const result = await deleteSubmission(submissionId);
+    if (result.success) {
+      setSubmissions((prev) => prev.filter((s) => s.id !== submissionId));
+    } else {
+      alert(result.error || "Fehler beim Löschen");
+    }
+    setDeleting(null);
+  }
+
+  function hasFeedback(s: Submission) {
+    return (s.feedback?.length || 0) > 0;
+  }
 
   return (
     <div className="animate-fade-in">
@@ -107,11 +175,14 @@ export function ReflexionenClient({ submissions }: ReflexionenClientProps) {
             {current.map((s) => {
               const courseId = s.assignment?.unit?.course_id || s.assignment?.unit?.course?.id;
               const unitId = s.assignment?.unit?.id;
+              const isEditing = editingId === s.id;
+              const canEdit = !hasFeedback(s);
 
               return (
                 <Link
                   key={s.id}
                   href={courseId && unitId ? `/courses/${courseId}/units/${unitId}` : "#"}
+                  onClick={(e) => { if (isEditing) e.preventDefault(); }}
                 >
                   <Card className="shadow-sm hover:shadow-md transition-shadow cursor-pointer group">
                     <CardContent className="p-5">
@@ -151,7 +222,35 @@ export function ReflexionenClient({ submissions }: ReflexionenClientProps) {
                               year: "numeric",
                             })}
                           </p>
-                          {s.status === "reviewed" && s.feedback?.[0] && (
+
+                          {/* Inline Edit */}
+                          {isEditing && (
+                            <div className="mt-3" onClick={(e) => e.stopPropagation()}>
+                              <Textarea
+                                value={editContent}
+                                onChange={(e) => setEditContent(e.target.value)}
+                                rows={5}
+                                className="text-sm mb-2"
+                              />
+                              <div className="flex gap-2">
+                                <Button
+                                  size="sm"
+                                  className="bg-[#0099A8] hover:bg-[#007A87]"
+                                  onClick={handleSaveEdit}
+                                  disabled={saving}
+                                >
+                                  <Save className="h-3.5 w-3.5 mr-1" />
+                                  {saving ? "Speichern..." : "Speichern"}
+                                </Button>
+                                <Button size="sm" variant="outline" onClick={cancelEdit}>
+                                  <X className="h-3.5 w-3.5 mr-1" />
+                                  Abbrechen
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+
+                          {s.status === "reviewed" && s.feedback?.[0] && !isEditing && (
                             <div className="mt-2 p-3 bg-[#0099A8]/5 rounded-lg">
                               <p className="text-xs text-muted-foreground font-medium mb-1">
                                 Feedback von {s.feedback[0].reviewer?.full_name || "Team PLI®"}
@@ -163,7 +262,58 @@ export function ReflexionenClient({ submissions }: ReflexionenClientProps) {
                             </div>
                           )}
                         </div>
-                        <ChevronRight className="h-5 w-5 text-muted-foreground shrink-0 group-hover:text-foreground transition-colors mt-1" />
+
+                        {/* Action Buttons */}
+                        <div className="flex items-center gap-1 shrink-0">
+                          {canEdit && !isEditing && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                              onClick={(e) => startEdit(e, s)}
+                              title="Bearbeiten"
+                            >
+                              <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                            </Button>
+                          )}
+                          {!isEditing && (
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  onClick={(e) => e.preventDefault()}
+                                  title="Löschen"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5 text-red-500" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Reflexion löschen?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Deine Reflexion{hasFeedback(s) ? " und das dazugehörige Feedback werden" : " wird"} unwiderruflich gelöscht.
+                                    Du kannst danach eine neue Reflexion für diesen Tag einreichen.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    className="bg-red-600 hover:bg-red-700"
+                                    onClick={() => handleDelete(s.id)}
+                                    disabled={deleting === s.id}
+                                  >
+                                    {deleting === s.id ? "Wird gelöscht..." : "Löschen"}
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          )}
+                          {!isEditing && (
+                            <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-foreground transition-colors" />
+                          )}
+                        </div>
                       </div>
                     </CardContent>
                   </Card>

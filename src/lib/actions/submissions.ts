@@ -81,6 +81,72 @@ export async function deleteAssignment(unitId: string) {
   return { success: true };
 }
 
+// ─── Submissions (Participant: Edit & Delete) ───
+
+export async function updateSubmission(submissionId: string, content: string) {
+  const { supabase, user } = await requireAuth();
+
+  // Verify ownership
+  const admin = createAdminClient();
+  const { data: submission } = await admin
+    .from("submissions")
+    .select("user_id, status, feedback(id)")
+    .eq("id", submissionId)
+    .single();
+
+  if (!submission || submission.user_id !== user.id) {
+    return { error: "Keine Berechtigung" };
+  }
+  if ((submission.feedback as any[])?.length > 0) {
+    return { error: "Reflexion mit Feedback kann nicht mehr bearbeitet werden." };
+  }
+
+  const { error } = await admin
+    .from("submissions")
+    .update({ content })
+    .eq("id", submissionId);
+
+  if (error) return { error: error.message };
+  revalidatePath("/reflexionen");
+  return { success: true };
+}
+
+export async function deleteSubmission(submissionId: string) {
+  const { supabase, user } = await requireAuth();
+  const admin = createAdminClient();
+
+  // Check ownership OR admin/dozent role
+  const { data: profile } = await admin
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+
+  const { data: submission } = await admin
+    .from("submissions")
+    .select("user_id")
+    .eq("id", submissionId)
+    .single();
+
+  if (!submission) return { error: "Reflexion nicht gefunden" };
+
+  const isOwner = submission.user_id === user.id;
+  const isTeam = ["admin", "dozent"].includes(profile?.role || "");
+
+  if (!isOwner && !isTeam) {
+    return { error: "Keine Berechtigung" };
+  }
+
+  // Delete feedback first (FK constraint)
+  await admin.from("feedback").delete().eq("submission_id", submissionId);
+  const { error } = await admin.from("submissions").delete().eq("id", submissionId);
+
+  if (error) return { error: error.message };
+  revalidatePath("/reflexionen");
+  revalidatePath("/admin/reflexionen");
+  return { success: true };
+}
+
 // ─── Submissions (Participant) ───
 
 export async function createSubmission(params: {
