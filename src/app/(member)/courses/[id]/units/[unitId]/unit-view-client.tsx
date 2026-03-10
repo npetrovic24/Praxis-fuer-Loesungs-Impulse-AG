@@ -198,7 +198,7 @@ export function UnitViewClient({
           );
 
           return assignment ? (
-            <div className="flex flex-col xl:flex-row gap-8">
+            <div className="flex flex-col 2xl:flex-row gap-8">
               {/* Left column: content + downloads */}
               <div className="flex-1 min-w-0">
                 {contentBlocks.length === 0 ? (
@@ -218,7 +218,7 @@ export function UnitViewClient({
                 {fileDownloads}
               </div>
               {/* Right column: reflexion (sticky) */}
-              <div className="xl:w-[520px] xl:shrink-0 xl:sticky xl:top-6 xl:self-start">
+              <div className="2xl:w-[440px] 2xl:shrink-0 2xl:sticky 2xl:top-6 2xl:self-start">
                 <ReflexionForm
                   assignment={assignment}
                   existingSubmission={existingSubmission}
