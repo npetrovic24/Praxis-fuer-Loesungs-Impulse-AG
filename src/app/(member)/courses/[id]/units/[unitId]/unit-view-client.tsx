@@ -47,6 +47,22 @@ function ContentBlockRenderer({ block }: { block: ContentBlock }) {
     case "canva_embed":
       return <CanvaEmbed blockId={block.id} title={content.title as string} />;
 
+    case "video":
+      return (
+        <div className="relative w-full overflow-hidden rounded-xl border border-border/50 bg-gradient-to-b from-muted/30 to-muted/10 shadow-sm">
+          <div className="aspect-[16/9] relative">
+            <iframe
+              src={content.url as string}
+              className="absolute inset-0 h-full w-full"
+              loading="lazy"
+              allowFullScreen
+              allow="autoplay; fullscreen"
+              title="Video"
+            />
+          </div>
+        </div>
+      );
+
     case "text":
       return (
         <div
