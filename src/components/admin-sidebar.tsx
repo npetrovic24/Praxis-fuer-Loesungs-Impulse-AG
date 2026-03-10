@@ -14,7 +14,7 @@ const allNavItems = [
   { href: "/admin/reflexionen", label: "Reflexionen", icon: MessageCircle, adminOnly: false },
   { href: "/admin/members", label: "Teilnehmer", icon: Users, adminOnly: false },
   { href: "/admin/team", label: "Team", icon: UserCog, adminOnly: true },
-  { href: "/admin/courses", label: "Lehrgänge", icon: BookOpen, adminOnly: true },
+  { href: "/admin/courses", label: "Lehrgänge", icon: BookOpen, adminOnly: false },
   { href: "/admin/chat", label: "Chat", icon: MessageSquare, adminOnly: false },
 ];
 
